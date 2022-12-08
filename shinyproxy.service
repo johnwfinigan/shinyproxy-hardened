@@ -1,0 +1,32 @@
+[Unit]
+Description=ShinyProxy
+After=syslog.target network.target
+ 
+[Service]
+Type=simple
+ExecStart=/usr/bin/java -jar /opt/shinyproxy/shinyproxy.jar
+KillMode=process
+StandardOutput=journal
+StandardError=journal
+SuccessExitStatus=143
+
+DynamicUser=true
+User=shinyproxy_run
+Group=shinyproxy_run
+WorkingDirectory=/opt/shinyproxy
+PrivateDevices=true
+ProtectClock=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictAddressFamilies=AF_UNIX AF_INET
+RestrictRealtime=true
+#SELinuxContext=httpd_t
+ProtectHome=true
+LockPersonality=true
+RestrictSUIDSGID=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,107 @@
+---
+- name: set up shinyproxy and dependencies
+  hosts: all
+  become: true
+  tasks:
+
+    - name: fail if selinux not enforcing
+      shell: |
+        if [ `getenforce` != Enforcing ] ; then exit 111; fi
+
+    - name: install distro dependencies
+      yum:
+        name: [ "yum-utils", "container-selinux", "java-1.8.0-openjdk-headless" ]
+        state: present
+
+
+    - name: add docker repo
+      shell: |
+        set -e
+        yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+      args:
+        creates: /etc/yum.repos.d/docker-ce.repo
+
+
+    - name: install docker
+      yum:
+        name: [ "docker-ce", "docker-ce-cli", "containerd.io" ]
+        state: present
+
+    - name: create docker config directory
+      file:
+        path: /etc/docker
+        state: directory
+        mode: 0700
+
+
+    - name: configure docker nsremap
+      copy:
+        dest: /etc/docker/daemon.json
+        content: "{ \"userns-remap\": \"default\" }\n"
+        mode: 0644
+        backup: true
+
+    - name: create docker systemd override unit file
+      copy:
+        remote_src: true
+        src: /usr/lib/systemd/system/docker.service
+        dest: /etc/systemd/system/docker.service
+        mode: 0755
+        force: false
+
+    - name: configure docker shiny tcp port, selinux use
+      lineinfile:
+        line: 'ExecStart=/usr/bin/dockerd --no-new-privileges --selinux-enabled -H tcp://127.0.0.1:2375 --containerd=/run/containerd/containerd.sock'
+        path: /etc/systemd/system/docker.service
+        state: present
+        regexp: '^ExecStart=/usr/bin/dockerd'
+        backup: true
+      register: docker_restart
+
+
+    - name: reload start and enable docker
+      systemd:
+        daemon_reload: true
+        name: docker.service
+        state: restarted
+        enabled: true
+      when: docker_restart.changed
+
+
+    - name: source /root/.dockersocket for admin convenience - not needed for shiny function
+      copy:
+        dest: /root/.dockersocket
+        content: "export DOCKER_HOST=\"tcp://127.0.0.1:2375\"\n"
+        mode: 0600
+
+
+    - name: create shinyproxy install directory
+      file:
+        path: /opt/shinyproxy
+        state: directory
+        mode: 0755
+
+    - name: copy in shinyproxy config - do not use official rpm, it will overwrite customized systemd unit
+      copy:
+        src: "{{item.s}}"
+        dest: "{{item.d}}"
+        mode: 0644
+        force: false
+      with_items:
+        - { "s": "shinyproxy.service", "d": "/etc/systemd/system/shinyproxy.service" }
+#        - { "s": "application.yml", "d": "/opt/shinyproxy/application.yml" }
+
+    - name: get shinyproxy executable
+      get_url:
+        url: https://www.shinyproxy.io/downloads/shinyproxy-2.6.1.jar
+        dest: /opt/shinyproxy/shinyproxy.jar
+        mode: 0644
+        checksum: "sha256:eb313bc84aeaf49b59cdf3946d65157753d4a9b611893d0121c57f49dacffdc9"
+
+
+    - name: reload and enable shinyproxy
+      systemd:
+        daemon_reload: true
+        name: shinyproxy.service
+        enabled: true
+        state: started
