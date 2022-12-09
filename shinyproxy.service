@@ -22,11 +22,16 @@ ProtectKernelModules=true
 ProtectKernelTunables=true
 RestrictAddressFamilies=AF_UNIX AF_INET
 RestrictRealtime=true
-#SELinuxContext=httpd_t
 ProtectHome=true
 LockPersonality=true
+
+# these are implied by DynamicUser, but are here for visibility
+ProtectSystem=strict
+PrivateTmp=true
+RestrictIPC=true
 RestrictSUIDSGID=true
 NoNewPrivileges=true
+
 
 [Install]
 WantedBy=multi-user.target
