@@ -46,7 +46,7 @@
         remote_src: true
         src: /usr/lib/systemd/system/docker.service
         dest: /etc/systemd/system/docker.service
-        mode: 0755
+        mode: 0644
         force: false
 
     - name: configure docker shiny tcp port, selinux use
